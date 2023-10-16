@@ -2,20 +2,30 @@ import {
   describe, test, expect, beforeAll, beforeEach,
 } from '@jest/globals';
 import * as algokit from '@algorandfoundation/algokit-utils';
-import algosdk from 'algosdk';
 import { algorandFixture } from '@algorandfoundation/algokit-utils/testing';
-import * as base32 from 'hi-base32';
+import algosdk from 'algosdk';
 import { EventDemoClient } from '../contracts/clients/EventDemoClient';
 
 const fixture = algorandFixture();
 
 let appClient: EventDemoClient;
 
-function getLogs(txns: any, logs: string[]) {
-  txns.forEach((t: any) => {
-    logs.push(...t.dt.lg);
+type AppLogs = {appID: BigInt, logs: string[], txID: string};
 
-    if (t.dt.itx) getLogs(t.dt.itx, logs);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getLogs(txns: any, logs: AppLogs[], genesisHash: Uint8Array, transactionID?: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  txns.forEach((t: any) => {
+    let txID = transactionID;
+    if (txID === undefined) {
+      // eslint-disable-next-line no-param-reassign
+      t.txn.gh = genesisHash;
+
+      txID = algosdk.Transaction.from_obj_for_encoding(t.txn).txID();
+    }
+    logs.push({ appID: BigInt(t.txn.apid || 0), logs: t.dt.lg, txID });
+
+    if (t.dt.itx) getLogs(t.dt.itx, logs, genesisHash, txID);
   });
 }
 
@@ -25,7 +35,6 @@ describe('EventDemo', () => {
   beforeAll(async () => {
     await fixture.beforeEach();
     const { algod, testAccount } = fixture.context;
-    const sender = algosdk.generateAccount();
 
     appClient = new EventDemoClient(
       {
@@ -47,9 +56,14 @@ describe('EventDemo', () => {
     const lastRound = (await fixture.context.algod.status().do())['last-round'];
 
     const block = await fixture.context.algod.block(lastRound).do();
-    const logs: string[] = [];
-    getLogs(block.block.txns, logs);
+    const logs: AppLogs[] = [];
 
-    console.log(logs);
+    getLogs(block.block.txns, logs, block.block.gh);
+
+    expect(logs[0].appID).toBeGreaterThan(BigInt(0));
+    expect(logs[0].logs).toEqual(['outer called']);
+    expect(logs[1].appID).toBe(BigInt(0));
+    expect(logs[1].logs).toEqual(['inner created']);
+    expect(logs[0].txID).toEqual(logs[1].txID);
   });
 });
