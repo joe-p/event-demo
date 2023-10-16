@@ -1,0 +1,24 @@
+{
+  "name": "EventDemo",
+  "desc": "",
+  "methods": [
+    {
+      "name": "outer",
+      "args": [],
+      "desc": "",
+      "returns": {
+        "type": "void",
+        "desc": ""
+      }
+    },
+    {
+      "name": "createApplication",
+      "desc": "",
+      "returns": {
+        "type": "void",
+        "desc": ""
+      },
+      "args": []
+    }
+  ]
+}

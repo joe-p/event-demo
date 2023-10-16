@@ -1,14 +1,23 @@
 import {
-  describe, test, expect, beforeAll, beforeEach
+  describe, test, expect, beforeAll, beforeEach,
 } from '@jest/globals';
 import * as algokit from '@algorandfoundation/algokit-utils';
 import algosdk from 'algosdk';
 import { algorandFixture } from '@algorandfoundation/algokit-utils/testing';
+import * as base32 from 'hi-base32';
 import { EventDemoClient } from '../contracts/clients/EventDemoClient';
 
 const fixture = algorandFixture();
 
 let appClient: EventDemoClient;
+
+function getLogs(txns: any, logs: string[]) {
+  txns.forEach((t: any) => {
+    logs.push(...t.dt.lg);
+
+    if (t.dt.itx) getLogs(t.dt.itx, logs);
+  });
+}
 
 describe('EventDemo', () => {
   beforeEach(fixture.beforeEach);
@@ -28,19 +37,19 @@ describe('EventDemo', () => {
     );
 
     await appClient.create.createApplication({});
+
+    await appClient.appClient.fundAppAccount(algokit.microAlgos(200_000));
   });
 
-  test('sum', async () => {
-    const a = 13;
-    const b = 37;
-    const sum = await appClient.doMath({ a, b, operation: 'sum' });
-    expect(sum.return?.valueOf()).toBe(BigInt(a + b));
-  });
+  test('event', async () => {
+    await appClient.outer({}, { sendParams: { fee: algokit.microAlgos(2000) } });
 
-  test('difference', async () => {
-    const a = 13;
-    const b = 37;
-    const diff = await appClient.doMath({ a, b, operation: 'difference' });
-    expect(diff.return?.valueOf()).toBe(BigInt(a >= b ? a - b : b - a));
+    const lastRound = (await fixture.context.algod.status().do())['last-round'];
+
+    const block = await fixture.context.algod.block(lastRound).do();
+    const logs: string[] = [];
+    getLogs(block.block.txns, logs);
+
+    console.log(logs);
   });
 });
