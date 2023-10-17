@@ -19,16 +19,21 @@ function getLogsFromBlock(
   txns: any,
   logs: AppLogs[],
   genesisHash: Uint8Array,
+  genesisID: string,
   transactionID?: string,
 ) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   txns.forEach((t: any) => {
     let txID = transactionID;
     if (txID === undefined) {
+      // txns in the block don't have the gi/gh, so we need to add them to generate the txID
+
       // eslint-disable-next-line no-param-reassign
       t.txn.gh = genesisHash;
 
-      // TODO: determine correct txID (this is wrong)
+      // eslint-disable-next-line no-param-reassign
+      t.txn.gen = genesisID;
+
       txID = algosdk.Transaction.from_obj_for_encoding(t.txn).txID();
     }
     logs.push({
@@ -38,7 +43,7 @@ function getLogsFromBlock(
       txID,
     });
 
-    if (t.dt.itx) getLogsFromBlock(t.dt.itx, logs, genesisHash, txID);
+    if (t.dt.itx) getLogsFromBlock(t.dt.itx, logs, genesisHash, genesisID, txID);
   });
 }
 
@@ -118,7 +123,6 @@ describe('EventDemo', () => {
 
   /*
     TODO:
-      - Fix transaction ID in block parsing (generated txn ID is incorrect)
       - Fix log decoding in block parsing (logs with non-ascii characters are decoded incorrectly)
   */
   describe.skip('block parsing', () => {
@@ -133,7 +137,7 @@ describe('EventDemo', () => {
 
       const blockLogs: AppLogs[] = [];
 
-      getLogsFromBlock(block.block.txns, blockLogs, block.block.gh);
+      getLogsFromBlock(block.block.txns, blockLogs, block.block.gh, block.block.gen as string);
 
       const txID = result.transaction.txID();
 
@@ -159,7 +163,7 @@ describe('EventDemo', () => {
 
       const blockLogs: AppLogs[] = [];
 
-      getLogsFromBlock(block.block.txns, blockLogs, block.block.gh);
+      getLogsFromBlock(block.block.txns, blockLogs, block.block.gen, block.block.gh);
 
       const outterEvent = getEventFromLogs('outterEvent(string)', blockLogs);
       const innerEvent = getEventFromLogs('innerEvent(string)', blockLogs);
