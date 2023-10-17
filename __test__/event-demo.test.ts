@@ -5,6 +5,7 @@ import * as algokit from '@algorandfoundation/algokit-utils';
 import { algorandFixture } from '@algorandfoundation/algokit-utils/testing';
 import algosdk from 'algosdk';
 import { PendingTransactionResponse } from 'algosdk/dist/types/client/v2/algod/models/types';
+import { sha512_256 } from 'js-sha512';
 import { EventDemoClient } from '../contracts/clients/EventDemoClient';
 
 const fixture = algorandFixture();
@@ -60,6 +61,24 @@ function getLogsFromPendingTxns(
   });
 }
 
+function getEventFromLogs(event: string, logs: AppLogs[]) {
+  const selector = sha512_256(event).slice(0, 8);
+
+  const events: {appID: bigint, txID: string, args: Uint8Array}[] = [];
+  logs.forEach((l) => l.logs.forEach((log) => {
+    const hexLog = Buffer.from(log).toString('hex');
+    if (hexLog.startsWith(selector)) {
+      events.push({
+        appID: l.appID,
+        txID: l.txID,
+        args: log.slice(4),
+      });
+    }
+  }));
+
+  return events;
+}
+
 describe('EventDemo', () => {
   beforeEach(fixture.beforeEach);
 
@@ -82,8 +101,8 @@ describe('EventDemo', () => {
   });
 
   test('logParsing', async () => {
-    const outerLog = new Uint8Array(Buffer.from('outer called'));
-    const innerLog = new Uint8Array(Buffer.from('inner created'));
+    const outerLog = 'this is a regular outer log';
+    const innerLog = 'this is a regular inner log';
 
     const { appId } = await appClient.appClient.getAppReference();
 
@@ -94,9 +113,9 @@ describe('EventDemo', () => {
     getLogsFromPendingTxns(result.confirmations!, txnLogs);
 
     expect(txnLogs[0].appID).toEqual(BigInt(appId));
-    expect(txnLogs[0].logs).toEqual([outerLog]);
+    expect(Buffer.from(txnLogs[0].logs[0]).toString()).toEqual(outerLog);
     expect(txnLogs[1].appID).toBeGreaterThan(txnLogs[0].appID);
-    expect(txnLogs[1].logs).toEqual([innerLog]);
+    expect(Buffer.from(txnLogs[1].logs[0]).toString()).toEqual(innerLog);
     expect(txnLogs[0].txID).toEqual(txnLogs[1].txID);
 
     const lastRound = (await fixture.context.algod.status().do())['last-round'];
@@ -108,9 +127,17 @@ describe('EventDemo', () => {
     getLogsFromBlock(block.block.txns, blockLogs, block.block.gh);
 
     expect(blockLogs[0].appID).toEqual(BigInt(appId));
-    expect(blockLogs[0].logs).toEqual([outerLog]);
+    expect(Buffer.from(blockLogs[0].logs[0]).toString()).toEqual(outerLog);
     expect(blockLogs[1].appID).toEqual(BigInt(0));
-    expect(blockLogs[1].logs).toEqual([innerLog]);
+    expect(Buffer.from(blockLogs[1].logs[0]).toString()).toEqual(innerLog);
     expect(blockLogs[0].txID).toEqual(blockLogs[1].txID);
+
+    const outterEvent = getEventFromLogs('outterEvent(string)', txnLogs);
+    const innerEvent = getEventFromLogs('innerEvent(string)', txnLogs);
+
+    expect(outterEvent.length).toEqual(1);
+    expect(innerEvent.length).toEqual(1);
+    expect(Buffer.from(outterEvent[0].args).toString()).toEqual('this is an outer event log');
+    expect(Buffer.from(innerEvent[0].args).toString()).toEqual('this is an inner event log');
   });
 });

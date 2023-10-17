@@ -4,7 +4,7 @@
   "license": "MIT",
   "scripts": {
     "generate-client": "algokitgen generate -a contracts/artifacts/EventDemo.json -o contracts/clients/EventDemoClient.ts",
-    "compile-contract": "tealscript contracts/event-demo.algo.ts contracts/artifacts",
+    "compile-contract": "bun ../../algorand-devrel/tealscript/src/bin/tealscript.ts contracts/event-demo.algo.ts contracts/artifacts",
     "generate-components": "algokit-generate-component contracts/artifacts/EventDemo.json contracts/artifacts/components",
     "build": "npm run compile-contract && npm run generate-client",
     "test": "npm run build && jest",
@@ -15,6 +15,7 @@
     "@algorandfoundation/algokit-utils": "^2.2.0",
     "algosdk": "^2.4.0",
     "hi-base32": "^0.5.1",
+    "js-sha512": "^0.8.0",
     "msgpackr": "^1.9.9"
   },
   "devDependencies": {
